@@ -589,8 +589,8 @@ def validate_openebs():
         "",
         "openebs",
         "running",
-        label="openebs.io/component-name=ndm",
-        timeout_insec=900,
+        label="component=nfs-provisioner",
+        timeout_insec=300,
     )
     print("OpenEBS is up and running.")
     here = os.path.dirname(os.path.abspath(__file__))

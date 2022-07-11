@@ -15,12 +15,26 @@ print_iscsi_help() {
     echo "Please refer to the OpenEBS prerequisites (https://docs.openebs.io/docs/next/prerequisites.html)"
 }
 
+print_nfsc_help() {
+    echo "Make sure nfs client is installed on all nodes."
+    echo "To enable nfs client: "
+    echo "      sudo systemctl enable nfs-common"
+    echo "Please refer to the OpenEBS prerequisites (https://docs.openebs.io/docs/next/prerequisites.html)"
+    echo "Might be different on non Ubuntu/Debian distributions"
+}
+
 # Check if iscsid is installed
 if ! is_strict && ! systemctl is-enabled iscsid | grep enabled &> /dev/null
   then
     echo "iscsid is not available or enabled."
     print_iscsi_help
     exit   
+fi
+
+if ! is_strict && systemctl is-enabled nfs-common | grep enabled &> /dev/null
+  then "nfs client is not available or enabled."
+  print_nfsc_help
+  exit
 fi
 
 "$SNAP/microk8s-enable.wrapper" dns
@@ -33,17 +47,21 @@ HELM="$SNAP_DATA/bin/helm3 --kubeconfig=$SNAP_DATA/credentials/client.config"
 
 $HELM repo add openebs https://openebs.github.io/charts
 $HELM repo update
-$HELM -n openebs install openebs openebs/openebs \
-    --version 3.0.x \
-    --set cstor.enabled=true \
+$HELM -n $OPENEBS_NS install openebs openebs/openebs \
+    --version 3.2.x \
+    --set ndm.enabled=false \
+    --set ndmOperator.enabled=false \
     --set jiva.enabled=true \
-    --set legacy.enabled=false \
-    --set cstor.cleanup.image.tag="latest" \
-    --set cstor.csiNode.kubeletDir="$SNAP_COMMON/var/lib/kubelet/" \
+    --set jiva.storageClass.name=openebs-jiva \
+    --set jiva.storageClass.isDefaultClass=true \
     --set jiva.csiNode.kubeletDir="$SNAP_COMMON/var/lib/kubelet/" \
     --set localprovisioner.basePath="$SNAP_COMMON/var/openebs/local" \
-    --set ndm.sparse.path="$SNAP_COMMON/var/openebs/sparse" \
-    --set varDirectoryPath.baseDir="$SNAP_COMMON/var/openebs"
+    --set varDirectoryPath.baseDir="$SNAP_COMMON/var/openebs" \
+    --set nfs-provisioner.enabled=true \
+    --set nfs-provisioner.nfsStorageClass.allowVolumeExpansion=true \
+    --set nfs-provisioner.nfsStorageClass.backendStorageClass=openebs-jiva
+
+$KUBECTL patch sc openebs-kernel-nfs -p '{"allowVolumeExpansion": true}'
 
 echo "OpenEBS is installed"
 
@@ -52,27 +70,8 @@ echo ""
 echo "" 
 echo "-----------------------"
 echo "" 
-echo "When using OpenEBS with a single node MicroK8s, it is recommended to use the openebs-hostpath StorageClass"
-echo "An example of creating a PersistentVolumeClaim utilizing the openebs-hostpath StorageClass"
-echo "" 
-echo "" 
-echo "kind: PersistentVolumeClaim 
-apiVersion: v1
-metadata:
-  name: local-hostpath-pvc
-spec:
-  storageClassName: openebs-hostpath
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5G
-"
-echo "" 
-echo "" 
-echo "-----------------------"
-echo "" 
 echo "If you are planning to use OpenEBS with multi nodes, you can use the openebs-jiva-csi-default StorageClass."
+echo "The class should be enabled as default."
 echo "An example of creating a PersistentVolumeClaim utilizing the openebs-jiva-csi-default StorageClass"
 echo "" 
 echo "" 
@@ -88,8 +87,26 @@ spec:
     requests:
       storage: 5G
 "
+echo "" 
+echo "If you are planning to use OpenEBS with RWX accessModes, than use openebs-kernel-nfs StorageClass"
+echo "An example of creating a PersistentVolumeClaim utilizing the openebs-kernel-nfs StorageClass"
+echo "" 
+echo "" 
+echo "kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: nfs-volume-claim
+spec:
+  storageClassName: openebs-kernel-nfs
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5G
+"
 
 if is_strict
 then
   print_iscsi_help
+  print_nfsc_help
 fi

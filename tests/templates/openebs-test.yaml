@@ -1,14 +1,14 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: local-hostpath-pvc
+  name: openebs-nfs-pvc
 spec:
-  storageClassName: openebs-hostpath
+  storageClassName: openebs-kernel-nfs
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany
   resources:
     requests:
-      storage: 5G
+      storage: 1G
 ---
 apiVersion: v1
 kind: Pod
@@ -35,4 +35,4 @@ spec:
   volumes:
     - name: my-data-volume
       persistentVolumeClaim:
-        claimName: local-hostpath-pvc
+        claimName: openebs-nfs-pvc
