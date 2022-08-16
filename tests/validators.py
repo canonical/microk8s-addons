@@ -671,3 +671,12 @@ def validate_kata():
     kubectl("apply -f {}".format(manifest))
     wait_for_pod_state("", "default", "running", label="app=kata")
     kubectl("delete -f {}".format(manifest))
+
+
+def validate_chaosmesh():
+    """
+    Validate chaosmesh
+    """
+    wait_for_pod_state(
+        "", "chaosmesh", "running", label="app.kubernetes.io/instance=chaos-mesh"
+    )

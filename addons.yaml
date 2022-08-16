@@ -141,3 +141,10 @@ microk8s-addons:
       check_status: "deployment.apps/argo-cd-argocd-server"
       supported_architectures:
         - amd64
+
+    - name: "chaosmesh"
+      description: "ChaosMesh chaos framework"
+      version: "2.1.5"
+      check_status: "pod/chaos"
+      supported_architectures:
+        - amd64

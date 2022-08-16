@@ -32,6 +32,7 @@ from validators import (
     validate_portainer,
     validate_openfaas,
     validate_openebs,
+    validate_chaosmesh,
     validate_kata,
     validate_starboard,
     validate_argocd,
@@ -441,3 +442,18 @@ class TestAddons(object):
         validate_kata()
         print("Disabling kata")
         microk8s_disable("kata")
+
+    @pytest.mark.skipif(
+        platform.machine() != "x86_64",
+        reason="ChaosMesh tests are only relevant in x86 architectures",
+    )
+    def test_chaosmesh(self):
+        """
+        Sets up and validates ChaosMesh.
+        """
+        print("Enabling chaosmesh")
+        microk8s_enable("chaosmesh")
+        print("Validating chaosmesh")
+        validate_chaosmesh()
+        print("Disabling chaosmesh")
+        microk8s_disable("chaosmesh")
