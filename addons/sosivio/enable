@@ -2,58 +2,190 @@
 
 set -e
 
+# microk8s vars
 source $SNAP/actions/common/utils.sh
 CURRENT_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 
+KUBECTL="$SNAP/microk8s-kubectl.wrapper"
+HELM="$SNAP/microk8s-helm3.wrapper"
+
+
+
+# script vars
 BLUE='\033[0;34m'
 NC='\033[0m'
 BOLD='\033[1m'
-echo ""
-echo -e "${BLUE}Enabling Sosivio${NC}"
-echo ""
 
-"$SNAP/microk8s-enable.wrapper" dns
-"$SNAP/microk8s-enable.wrapper" helm3
-
-
-KUBECTL="$SNAP/microk8s-kubectl.wrapper"
-HELM="$SNAP/microk8s-helm3.wrapper"
 NAMESPACE_SOSIVIO="sosivio"
 DASHBOARD_SERVICE="dashboard-lb"
 
+HELM_REPO_URL="https://helm.sosiv.io"
+HELM_REPO_NAME="sosivio"
+HELM_VERSION="1.7.1"
+WAIT_SECONDS=300
+DEBUG=0
+
+usage () {
+  echo '
+Sosivio Plugin for Microk8s
+
+For Additional information about Sosivio please infer our website:
+https:/sosiv.io
+Or The official Documentation:
+https://docs.sosiv.io
+
+Usage:
+  microk8s enable sosivio
+
+Flags:
+    -d         enable debug prints
+    -v string  install a specific helm chart version (default to $HELM_VERSION)
+    -u string  the URL of the helm repo to fetch the charts from (default "$HELM_REPO_URL")
+    -n string  the name of the helm repo name to add (default "$HELM_REPO_NAME")
+    -w int     amount of time in seconds to wait for sosivio to become active (default "$WAIT_SECONDS")
+'
+}
+
+# opt_error will print $1 input, Help and will exit with code 1
+opt_error() {
+  echo $1
+  usage
+  exit 1
+}
 
 
-$HELM repo add sosivio https://helm.sosiv.io > /dev/null 2>&1
-$HELM repo update > /dev/null 2>&1
-$KUBECTL create ns $NAMESPACE_SOSIVIO > /dev/null 2>&1 || true
-$HELM upgrade -n $NAMESPACE_SOSIVIO --install \
-  sosivio sosivio/sosivio --version 1.5.3 \
-  --set expose=LoadBalancer > /dev/null 2>&1 || true
+print_debug() {
+  if [ $DEBUG -eq 1 ]; then
+    echo "DEBUG: $1"
+  fi
+}
 
-echo ""
-echo "Waiting for Sosivio to become active..."
-echo "It might take a while if your network connection is slow."
+# install microk8s addons that are a prerequisite to Sosivio addon
+install_addons_prereq () {
+  addons=("dns" "helm3")
+  print_debug "enabling prerequisites addons..."
+  for addon in ${addons[@]}; do
+    print_debug "  enabling $addon"
+    "$SNAP/microk8s-enable.wrapper" $addon &> /dev/null
+  done
+  print_debug "all prerequisites addons installed successfully"
+  # "$SNAP/microk8s-enable.wrapper" dns
+  # "$SNAP/microk8s-enable.wrapper" helm3
+}
 
-WATCH="$KUBECTL rollout status --watch"
-until $WATCH deploy -n ${NAMESPACE_SOSIVIO} sosivio-dashboard --watch > /dev/null 2>&1
-do
-  sleep 1
+add_helm_repo () {
+  print_debug "adding repo $HELM_REPO_NAME $HELM_REPO_URL"
+  $HELM repo add $HELM_REPO_NAME $HELM_REPO_URL > /dev/null 2>&1
+  print_debug "updating repo..."
+  $HELM repo update $HELM_REPO_NAME > /dev/null 2>&1
+}
+
+install_soivio () {
+
+  echo ""
+  echo -e "${BLUE}Enabling Sosivio${NC}"
+  echo ""
+
+  print_debug "  creating $NAMESPACE_SOSIVIO namespace"
+  $KUBECTL create ns $NAMESPACE_SOSIVIO > /dev/null 2>&1 || true
+
+  HELM_CMD="$HELM upgrade --install -n $NAMESPACE_SOSIVIO \
+            --set expose=LoadBalancer --set adminPassword=microsivio --version=$HELM_VERSION"
+  print_debug "applying helm chart"
+  $HELM_CMD sosivio $HELM_REPO_NAME/sosivio &> /dev/null
+
+}
+
+wait_for_sosivio () {
+
+  echo ""
+  echo "Waiting for Sosivio to become active..."
+  echo "It might take a while if your network connection is slow."
+
+  WATCH="$KUBECTL rollout status --watch"
+  start_time=$(date +'%s')
+  until $WATCH deploy -n ${NAMESPACE_SOSIVIO} sosivio-dashboard --watch > /dev/null 2>&1
+  do
+    if [ $(( $start_time + $WAIT_SECONDS )) -lt $(date +'%s') ] ; 
+    then
+        echo "sosivio wait time exceeded ($WAIT_SECONDS seconds)"
+        echo "please check your internet connection or run again with '-w' flag."
+        echo "check 'microk8s enable sosivio -h' for more details"
+        echo ""
+        echo "note: sosivio is still getting deployed, you can check if all the pods are running using:"
+        echo "microk8s kubectl get pods -n $NAMESPACE_SOSIVIO"
+        exit 1
+    fi
+    sleep 1
+  done
+
+}
+
+
+print_finished () {
+  echo ""
+  echo ""
+  echo "Sosivio is reachable using the following local address:"
+  echo -e "${BOLD}http://localhost:$(${KUBECTL} get svc ${DASHBOARD_SERVICE} -n ${NAMESPACE_SOSIVIO} -o jsonpath='{.spec.ports[0].nodePort}')${NC}"
+  echo ""
+  echo "Alternatively you can use port-forward:"
+  echo "'microk8s kubectl port-forward -n ${NAMESPACE_SOSIVIO} svc/${DASHBOARD_SERVICE} 8088'"
+  echo ""
+  echo "Your first login credentials are:"
+  echo "Username: admin"
+  echo "Password: $(${KUBECTL} get secret -n ${NAMESPACE_SOSIVIO} sosivio-admin-otp -o jsonpath='{.data.password}' | base64 -d)"
+  echo ""
+  echo "You can get this password again using the following command:"
+  echo "microk8s kubectl get secret -n ${NAMESPACE_SOSIVIO} sosivio-admin-otp -o jsonpath='{.data.password}' | base64 -d"
+  echo ""
+  echo -e "${BLUE}Sosivio Enabled${NC}"
+}
+
+
+
+################# main #################
+
+
+while getopts "dv:u:n:h" opt; do
+  case $opt in
+    d)
+      DEBUG=1
+      ;;
+    v)
+      if [ -z $OPTARG ] ; then
+        opt_error "error: -v flag requires parameter."
+      fi
+      HELM_VERSION=$OPTARG
+      ;;
+    u)
+      if [ -z $OPTARG ] ; then
+        opt_error "error: -u flag requires parameter."
+      fi
+      HELM_REPO_URL=$OPTARG
+      ;;
+    n)
+      if [ -z $OPTARG ] ; then
+        opt_error "error: -n flag requires parameter."
+      fi
+      HELM_REPO_NAME=$OPTARG
+      ;;
+    *)
+      opt_error "Invalid option: -$OPTARG"
+      ;;
+  esac
 done
+echo "Sosivio Version $HELM_VERSION"
+echo "hint: use -v flag to set a different version. (ex - microk8s enable sosivio -v x.y.z)"
+sleep 3
 
-echo ""
-echo ""
-echo "Sosivio is reachable using the following local address:"
-#TODO: MAKE BOLD:
-echo -e "${BOLD}http://localhost:$(${KUBECTL} get svc ${DASHBOARD_SERVICE} -n ${NAMESPACE_SOSIVIO} -o jsonpath='{.spec.ports[0].nodePort}')${NC}"
-echo ""
-echo "Alternatively you can use port-forward:"
-echo "'microk8s kubectl port-forward -n ${NAMESPACE_SOSIVIO} svc/${DASHBOARD_SERVICE} 8088'"
-echo ""
-echo "Your first login credentials are:"
-echo "Username: admin"
-echo "Password: $(${KUBECTL} get secret -n ${NAMESPACE_SOSIVIO} sosivio-admin-otp -o jsonpath='{.data.password}' | base64 -d)"
-echo ""
-echo "You can get this password again using the following command:"
-echo "microk8s kubectl get secret -n ${NAMESPACE_SOSIVIO} sosivio-admin-otp -o jsonpath='{.data.password}' | base64 -d"
-echo ""
-echo -e "${BLUE}Sosivio Enabled${NC}"
+if [ $DEBUG -eq 1 ]; then
+  echo "debug flag set" >&2
+  echo "repo url is set to $HELM_REPO_URL"
+  echo "repo name is set to $HELM_REPO_NAME"
+fi
+
+install_addons_prereq
+add_helm_repo
+install_soivio
+wait_for_sosivio
+print_finished

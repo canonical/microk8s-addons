@@ -1,6 +1,14 @@
 microk8s-addons:
   description: "List of all addons included in Microk8s."
   addons:
+    - name: "microcks"
+      description: "Open source Kubernetes Native tool for API Mocking and Testing"
+      version: "1.7.1"
+      check_status: "deployment.apps/microcks"
+      supported_architectures:
+        - arm64
+        - amd64
+
     - name: "dashboard-ingress"
       description: "Ingress definition for Kubernetes dashboard"
       version: "1.0.0"
@@ -11,7 +19,7 @@ microk8s-addons:
 
     - name: "istio"
       description: "Core Istio service mesh services"
-      version: "1.15.3"
+      version: "1.18.2"
       check_status: "${SNAP_DATA}/bin/istioctl"
       supported_architectures:
         - amd64
@@ -43,7 +51,7 @@ microk8s-addons:
 
     - name: "linkerd"
       description: "Linkerd is a service mesh for Kubernetes and other frameworks"
-      version: "2.11.3"
+      version: "2.13.5"
       check_status: "pod/linkerd-destination"
       supported_architectures:
         - amd64
@@ -51,7 +59,7 @@ microk8s-addons:
 
     - name: "cilium"
       description: "SDN, fast with full network policy"
-      version: "1.11.12"
+      version: "1.13.4"
       check_status: "pod/cilium"
       confinement: "classic"
       supported_architectures:
@@ -94,7 +102,7 @@ microk8s-addons:
 
     - name: "keda"
       description: "Kubernetes-based Event Driven Autoscaling"
-      version: "2.6.1"
+      version: "2.11.1"
       check_status: "pod/keda-operator"
       supported_architectures:
         - amd64
@@ -139,9 +147,10 @@ microk8s-addons:
 
     - name: "argocd"
       description: "Argo CD is a declarative continuous deployment for Kubernetes."
-      version: "2.3.3"
+      version: "2.7.2"
       check_status: "deployment.apps/argo-cd-argocd-server"
       supported_architectures:
+        - arm64
         - amd64
 
     - name: "osm-edge"
@@ -154,7 +163,7 @@ microk8s-addons:
 
     - name: "sosivio"
       description: "Kubernetes Predictive Troubleshooting, Observability, and Resource Optimization"
-      version: "1.0.0"
+      version: "1.7.1"
       check_status: "deployment.apps/sosivio-dashboard"
       supported_architectures:
         - amd64
@@ -168,12 +177,13 @@ microk8s-addons:
         - amd64
         - arm64
 
-    - name: "gopaddle-lite"
-      description: "Cheapest, fastest and simplest way to modernize your applications"
-      version: "4.2.5"
+    - name: "gopaddle"
+      description: "DevSecOps and Multi-Cloud Kubernetes Platform"
+      version: "4.2.9"
       check_status: "deployment.apps/gateway"
       supported_architectures:
         - amd64
+        - arm64
 
     - name: "ondat"
       description: "Ondat is a software-defined, cloud native storage platform for Kubernetes."
@@ -203,6 +213,15 @@ microk8s-addons:
       description: "Kubernetes native IoT software development framework."
       version: "0.11.0"
       check_status: "deployment.apps/shifu-crd-controller-manager"
+      supported_architectures:
+        - amd64
+        - arm64
+
+    - name: "kubearmor"
+      description: "Cloud-native runtime security enforcement system for k8s"
+      version: "0.10.2"
+      check_status: "daemonset.apps/kubearmor"
+      confinement: "classic"
       supported_architectures:
         - amd64
         - arm64

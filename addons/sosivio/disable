@@ -16,7 +16,7 @@ echo -e "${RED}Disabling Sosivio${NC}"
 
 echo "It may take up to 2 minutes..."
 
-$HELM delete sosivio -n ${NAMESPACE_SOSIVIO} > /dev/null 2>&1 
-$KUBECTL delete --grace-period=60 ns ${NAMESPACE_SOSIVIO} > /dev/null 2>&1 
+$HELM delete sosivio -n ${NAMESPACE_SOSIVIO} --wait > /dev/null 2>&1 || true
+$KUBECTL delete --grace-period=60 ns ${NAMESPACE_SOSIVIO} > /dev/null 2>&1 || true
 
 echo -e "${RED}Sosivio disabled${NC}"
