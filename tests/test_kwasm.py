@@ -12,6 +12,10 @@ from utils import (
 
 class TestKwasm(object):
     @pytest.mark.skipif(
+        os.environ.get("UNDER_TIME_PRESSURE") == None,
+        reason="Skipping test, expected to be tested when under time pressure",
+    )
+    @pytest.mark.skipif(
         os.environ.get("STRICT") == "yes",
         reason="Skipping kwasm tests in strict confinement as they are expected to fail",
     )

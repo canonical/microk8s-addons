@@ -1,3 +1,4 @@
+import os
 import pytest
 import platform
 
@@ -9,6 +10,10 @@ from utils import (
 
 
 class TestPortainer(object):
+    @pytest.mark.skipif(
+        os.environ.get("UNDER_TIME_PRESSURE") == None,
+        reason="Skipping test, expected to be tested when under time pressure",
+    )
     @pytest.mark.skipif(platform.machine() == "s390x", reason="Not available on s390x")
     def test_portainer(self):
         """
