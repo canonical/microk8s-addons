@@ -12,10 +12,7 @@ from utils import (
 
 
 class TestIstio(object):
-    @pytest.mark.skipif(
-        platform.machine() != "x86_64",
-        reason="Istio tests are only relevant in x86 architectures",
-    )
+    @pytest.mark.skipif(platform.machine() == "s390x", reason="Not available on s390x")
     @pytest.mark.skipif(
         os.environ.get("UNDER_TIME_PRESSURE") == "True",
         reason="Skipping istio and knative tests as we are under time pressure",
@@ -35,10 +32,7 @@ class TestIstio(object):
         """
         Validate istio by deploying the bookinfo app.
         """
-        if platform.machine() != "x86_64":
-            print("Istio tests are only relevant in x86 architectures")
-            return
-
+        @pytest.mark.skipif(platform.machine() == "s390x", reason="Not available on s390x")
         wait_for_installation()
         istio_services = ["pilot", "egressgateway", "ingressgateway"]
         for service in istio_services:
