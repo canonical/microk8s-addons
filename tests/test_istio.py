@@ -25,7 +25,7 @@ class TestIstio(object):
         Sets up and validate istio.
         """
         print("Enabling Istio")
-        microk8s_enable("istio")
+        microk8s_enable("istio", 300, optional_args="--istio-version 1.20.0")
         print("Validating Istio")
         self.validate_istio()
         print("Disabling Istio")

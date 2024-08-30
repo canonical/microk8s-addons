@@ -4,28 +4,103 @@ set -e
 
 source $SNAP/actions/common/utils.sh
 
-echo "Enabling Istio"
+# pod/servicegraph will start failing without dns
+"$SNAP/microk8s-enable.wrapper" dns
+
+
+ISTIO_LATEST=$(curl https://api.github.com/repos/istio/istio/tags 2>/dev/null | jq '.[0].name' | sed 's/"//g')
+
+#Takes one parameter to check if the version exists
+check_version() { 
+    local version="$1"
+    local versions=$(curl https://api.github.com/repos/istio/istio/tags 2>/dev/null | jq '.[].name')
+    local istio_versions=(${versions//\"/})
+
+    for item in "${istio_versions[@]}"; do
+        if [ "$item" == "$version" ]; then
+            version_out=1
+            return
+        fi
+    done
+
+    version_out=0
+    return
+}
+# Display every Istio version
+display_versions(){
+    echo "Available Istio versions:"
+    echo ""
+    curl https://api.github.com/repos/istio/istio/tags 2>/dev/null | jq '.[].name'
+}
+# Function to display usage
+display_usage() {
+    echo "Usage: microk8s enable istio [--istio-version <VERSION>]"
+    echo "Options:"
+    echo "  --istio-version <VERSION>   Specify the Istio version (default: $ISTIO_LATEST)"
+    exit 1
+}
+# set the Istio version provided by the user
+set_version (){
+
+    if [ $# -eq 0 ]; then
+      ISTIO_VERSION="$ISTIO_LATEST"
+    fi
+
+    while [[ $# -gt 0 ]]; do
+        key="$1"
+
+        case $key in
+            --istio-version)
+                ISTIO_VERSION="$2"
+                shift;shift 
+                check_version "$ISTIO_VERSION"
+
+                if [[ $version_out -eq 0 ]]; then
+                    echo "Specified version not available"
+                    display_versions
+                    
+                    echo "Aborting Istio installation: Use one of the versions listed above"
+                    exit 0
+                fi
+                ;;
+            *)
+                # unknown option
+                display_usage
+                ;;
+        esac
+    done
+
+    # Set Istio version to latest if not provided
+    if [ -z "$ISTIO_VERSION" ]; then
+        ISTIO_VERSION="$ISTIO_LATEST"
+    fi
+}
+
+echo "Enabling Istio version: $ISTIO_VERSION"
+
+set_version "$@"
+
 
 if [ ! -f "${SNAP_DATA}/bin/istioctl" ]
 then
-  ISTIO_VERSION="v1.18.2"
-  echo "Fetching istioctl version $ISTIO_VERSION."
-  ISTIO_ERSION=$(echo $ISTIO_VERSION | sed 's/v//g')
+
+  echo "Fetching istioctl version $ISTIO_VERSION ..."
+
   run_with_sudo mkdir -p "${SNAP_DATA}/tmp/istio"
   (cd "${SNAP_DATA}/tmp/istio"
-  fetch_as https://github.com/istio/istio/releases/download/${ISTIO_ERSION}/istio-${ISTIO_ERSION}-linux-amd64.tar.gz "$SNAP_DATA/tmp/istio/istio.tar.gz"
+  fetch_as https://github.com/istio/istio/releases/download/${ISTIO_VERSION}/istio-${ISTIO_VERSION}-linux-amd64.tar.gz "$SNAP_DATA/tmp/istio/istio.tar.gz"
   run_with_sudo gzip -q -d "$SNAP_DATA/tmp/istio/istio.tar.gz"
   run_with_sudo tar -xvf "$SNAP_DATA/tmp/istio/istio.tar"
-  run_with_sudo chmod 777 "$SNAP_DATA/tmp/istio/istio-${ISTIO_ERSION}")
+  run_with_sudo chmod 777 "$SNAP_DATA/tmp/istio/istio-${ISTIO_VERSION}")
   run_with_sudo mkdir -p "$SNAP_DATA/bin/"
-  run_with_sudo mv "$SNAP_DATA/tmp/istio/istio-${ISTIO_ERSION}/bin/istioctl" "$SNAP_DATA/bin/"
+  run_with_sudo mv "$SNAP_DATA/tmp/istio/istio-${ISTIO_VERSION}/bin/istioctl" "$SNAP_DATA/bin/"
   run_with_sudo chmod +x "$SNAP_DATA/bin/"
 
   run_with_sudo rm -rf "$SNAP_DATA/tmp/istio"
+
 fi
 
-# pod/servicegraph will start failing without dns
-"$SNAP/microk8s-enable.wrapper" dns
+
 
 run_with_sudo "$SNAP_DATA/bin/istioctl" -c "${SNAP_DATA}/credentials/client.config" install --set profile=demo -y
 
