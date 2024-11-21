@@ -7,7 +7,7 @@ set -e
 
 HELM="$SNAP/microk8s-helm3.wrapper"
 NAMESPACE_STUNNER_SYSTEM="stunner-system"
-VERSION_STUNNER_SYSTEM="0.18.0"
+VERSION_STUNNER_SYSTEM="1.0.0"
 
 echo "Enabling STUNner..."
 
