@@ -142,16 +142,19 @@ def _enable_sriovdp(resources: dict) -> None:
     while time.time() - now <= timeout:
         sriov_allocatable_resources = _get_sriov_allocatable_resources()
 
-        for resource, pci_addresses in resources.items():
-            if sriov_allocatable_resources[f"intel.com/{resource}"] != str(len(pci_addresses)):
+        try:
+            if all(
+                sriov_allocatable_resources[f"intel.com/{resource}"] == str(len(pci_addresses))
+                for resource, pci_addresses in resources.items()
+            ):
+                return
+            else:
                 print("SR-IOV Network Device Plugin not ready, " +
                     f"intel.com/{resource} does not have enough allocatable resources.")
-                break
-        else:
-            return
+        except KeyError:
+            print("Waiting for SR-IOV Network Device Plugin to be ready...")
 
         wait = 5
-        print(f"Waiting {wait}s for SR-IOV Network Device Plugin to be ready...")
         time.sleep(wait)
 
     raise TimeoutError("Unable to start SR-IOV Network Device Plugin. Operation timed out!")

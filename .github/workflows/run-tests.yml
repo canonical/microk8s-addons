@@ -19,7 +19,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-setuptools nfs-common
-          sudo pip3 install --upgrade pip
+          sudo pip3 install --ignore-installed --upgrade pip
           sudo pip3 install -r tests/requirements.txt
       - name: Running addons tests
         run: |
