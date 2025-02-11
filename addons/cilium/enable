@@ -12,18 +12,18 @@ INSTALL_CILIUM_CLI="True"
 # Parse command-line arguments
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --version)
-      CILIUM_VERSION="$2"
-      shift 2
-      ;;
-    --skip-cilium-cli)
-      INSTALL_CILIUM_CLI="False"
-      shift
-      ;;
-    *)
-      echo "Invalid option: $1" >&2
-      exit 1
-      ;;
+  --version)
+    CILIUM_VERSION="$2"
+    shift 2
+    ;;
+  --skip-cilium-cli)
+    INSTALL_CILIUM_CLI="False"
+    shift
+    ;;
+  *)
+    echo "Invalid option: $1" >&2
+    exit 1
+    ;;
   esac
 done
 
@@ -48,8 +48,7 @@ if grep -qE "bin_dir.*SNAP}\/" $SNAP_DATA/args/containerd-template.toml; then
 fi
 
 # Disable Calico CNI
-if [ -e "$SNAP_DATA/var/lock/ha-cluster" ] && [ -e "$SNAP_DATA/args/cni-network/cni.yaml" ]
-then
+if [ -e "$SNAP_DATA/var/lock/ha-cluster" ] && [ -e "$SNAP_DATA/args/cni-network/cni.yaml" ]; then
   echo "Disabling Calico CNI"
   "$SNAP/microk8s-kubectl.wrapper" delete -f "$SNAP_DATA/args/cni-network/cni.yaml"
   # give a bit slack before moving the file out, sometimes it gives out this error "rpc error: code = Unknown desc = checkpoint in progress".
@@ -61,12 +60,11 @@ echo "Enabling Cilium"
 
 # Cilium Supports Arm beginning v1.11.12 and greater
 if [ -z "$CILIUM_VERSION" ]; then
-  CILIUM_VERSION="v1.15.2"
+  CILIUM_VERSION="v1.17.0"
 fi
 CILIUM_ERSION=$(echo $CILIUM_VERSION | sed 's/v//g')
 
-if [ -f "${SNAP_COMMON}/plugins/cilium" ]
-then
+if [ -f "${SNAP_COMMON}/plugins/cilium" ]; then
   echo "Cilium version $CILIUM_VERSION is already installed."
 else
   CILIUM_DIR="cilium-$CILIUM_ERSION"
@@ -77,33 +75,35 @@ else
 
   echo "Fetching cilium version $CILIUM_VERSION."
   run_with_sudo mkdir -p "${SNAP_DATA}/tmp/cilium"
-  (cd "${SNAP_DATA}/tmp/cilium"
-  fetch_as $SOURCE_URI/$CILIUM_VERSION.tar.gz "$SNAP_DATA/tmp/cilium/cilium.tar.gz"
-  if ! run_with_sudo gzip -f -d "$SNAP_DATA/tmp/cilium/cilium.tar.gz"; then
-    echo "Invalid version \"$CILIUM_VERSION\". Must be a branch on https://github.com/cilium/cilium."
-    exit 1
-  fi
-  run_with_sudo tar -xf "$SNAP_DATA/tmp/cilium/cilium.tar" "$CILIUM_DIR/install" "$CILIUM_DIR/$CILIUM_CNI_CONF")
+  (
+    cd "${SNAP_DATA}/tmp/cilium"
+    fetch_as $SOURCE_URI/$CILIUM_VERSION.tar.gz "$SNAP_DATA/tmp/cilium/cilium.tar.gz"
+    if ! run_with_sudo gzip -f -d "$SNAP_DATA/tmp/cilium/cilium.tar.gz"; then
+      echo "Invalid version \"$CILIUM_VERSION\". Must be a branch on https://github.com/cilium/cilium."
+      exit 1
+    fi
+    run_with_sudo tar -xf "$SNAP_DATA/tmp/cilium/cilium.tar" "$CILIUM_DIR/install" "$CILIUM_DIR/$CILIUM_CNI_CONF"
+  )
 
   run_with_sudo mv "$SNAP_DATA/args/cni-network/cni.conf" "$SNAP_DATA/args/cni-network/10-kubenet.conf" 2>/dev/null || true
   run_with_sudo mv "$SNAP_DATA/args/cni-network/flannel.conflist" "$SNAP_DATA/args/cni-network/20-flanneld.conflist" 2>/dev/null || true
   run_with_sudo cp "$SNAP_DATA/tmp/cilium/$CILIUM_DIR/$CILIUM_CNI_CONF" "$SNAP_DATA/args/cni-network/05-cilium-cni.conf"
-  
+
   IPv4_CLUSTER_CIDR="10.1.0.0/16"
   if [ -e "${SNAP_DATA}/args/cni-env" ]; then
     source "${SNAP_DATA}/args/cni-env"
   fi
 
   # Generate the YAMLs for Cilium and apply them
-  (cd "${SNAP_DATA}/tmp/cilium/$CILIUM_DIR/install/kubernetes"
-  # Add cilium repository
-  ${SNAP}/microk8s-helm3.wrapper repo add cilium https://helm.cilium.io/
-  ${SNAP}/microk8s-helm3.wrapper install cilium cilium/cilium --version ${CILIUM_VERSION} \
+  (
+    cd "${SNAP_DATA}/tmp/cilium/$CILIUM_DIR/install/kubernetes"
+    # Add cilium repository
+    ${SNAP}/microk8s-helm3.wrapper repo add cilium https://helm.cilium.io/
+    ${SNAP}/microk8s-helm3.wrapper install cilium cilium/cilium --version ${CILIUM_VERSION} \
       --namespace $NAMESPACE \
       --set cni.confPath="/var/snap/microk8s/current/args/cni-network" \
       --set cni.binPath="/var/snap/microk8s/current/opt/cni/bin" \
       --set cni.customConf=true \
-      --set containerRuntime.integration="containerd" \
       --set global.containerRuntime.socketPath="/var/snap/microk8s/common/run/containerd.sock" \
       --set daemon.runPath="/var/snap/microk8s/current/var/run/cilium" \
       --set operator.replicas=1 \
